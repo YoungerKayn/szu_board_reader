@@ -1,10 +1,10 @@
 import re
-from datetime import datetime, timedelta
+from datetime import datetime
 import requests as r
 
 # ========================= Configuration Part =========================
 clicks_limit = 0  # Push the news which have clicks more than this num
-push_token = 'efe5ea07bd37420a816c1c3d492c6a5f'  # Pushplus Token
+push_token = ''  # Pushplus Token
 headers = {
     'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/65.0.3325.181 Safari/537.36'}
 proxies = {'http': None, 'https': None}
