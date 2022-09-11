@@ -14,10 +14,23 @@ board_url = 'https://www1.szu.edu.cn/board/'
 # Some Regular Expressions
 re_type = re.compile(r"infotype=([\u4e00-\u9fa5]+)")
 re_depart = re.compile(r"value='([\u4e00-\u9fa5]+)'")
-re_link = re.compile(r'href="(view.asp\?id=[0-9]+)">')
+re_link = re.compile(r'href="view.asp\?id=([0-9]+)">')
 re_title = re.compile(r'href="view.asp\?id=[0-9]+">(.+?)</a>')
 re_date = re.compile(r'>([0-9]{4}-[0-9]{1,2}-[0-9]{1,2})<')
 re_clicks = re.compile(r'title="累计点击数">([0-9]+)')
+
+
+def get_history():
+    # News that have been pushed will be record in history.txt
+    history = []
+    try:
+        with open('history.txt', 'r', encoding='u8') as f:
+            history = f.read().split(',')
+            print(history)
+    except:
+        with open('history.txt','w',encoding='u8') as f:
+            history = []
+    return history
 
 
 def main():
@@ -65,6 +78,9 @@ def main():
     rank = []  # News' clicks ranking
     date_now = datetime.now()
 
+    # Get push history
+    history = get_history()
+
     # Used to match News' dates
     date_format = f'{date_now.year}-{date_now.month}-{date_now.day}'
 
@@ -72,8 +88,10 @@ def main():
     push = f"""<font face="黑体" color=green size=5>日期:{date_format}</font>  
 """
     for i in range(0, len(news_links)):
+        # Create News Objects
         locals()[f'news{i}'] = News(i)
-        if int(locals()[f'news{i}'].clicks()) >= clicks_limit and locals()[f'news{i}'].date() == date_format:
+
+        if int(locals()[f'news{i}'].clicks()) >= clicks_limit and locals()[f'news{i}'].date() == date_format and locals()[f'news{i}'].link() not in history:
             rank.append((i, locals()[f'news{i}'].clicks()))
 
     # Sort by clicks
@@ -81,20 +99,36 @@ def main():
     rank = list(map(lambda x: x[0], rank))
 
     for i in rank:
+        # Record News which will be pushed
+        history.append(f"{locals()[f'news{i}'].link()}")
+
         # Markdown Format
         push += (f"""  
-{order_num}. [{locals()[f'news{i}'].title()}]({board_url}{locals()[f'news{i}'].link()})  
+{order_num}. [{locals()[f'news{i}'].title()}]({board_url}view.asp?id={locals()[f'news{i}'].link()})  
 **{locals()[f'news{i}'].type()}、{locals()[f'news{i}'].depart()}** <p align="right">点击量:{locals()[f'news{i}'].clicks()}</p>  
 
 ---""")
+
         order_num += 1
-    try:
-        pushplus = r.get(
-            url=f'http://www.pushplus.plus/send?token={push_token}&title=今日通告&content={push}&template=markdown', proxies=proxies)
-    except:
-        print('Internet disconnected')
-        exit()
-    print(pushplus.text)  # Results
+    
+    # Write down history
+    with open('history.txt','w',encoding='u8') as f:
+        history = [i for i in history if i != '']
+        for i in history:
+            f.write(i+',')
+
+    # Check if need to push by pushplus
+    if push_token:
+        try:
+            pushplus = r.get(
+                url=f'http://www.pushplus.plus/send?token={push_token}&title=今日通告&content={push}&template=markdown', proxies=proxies)
+            print(pushplus.text)  # Results
+        except:
+            print('Internet disconnected')
+            exit()
+            
+    else:
+        print(push)
 
 
 if __name__ == '__main__':
