@@ -106,7 +106,7 @@ def main():
         # Markdown Format
         push_content += (f"""  
 {order_num}. [{locals()[f'news{i}'].title()}]({board_url}view.asp?id={locals()[f'news{i}'].link()})  
-**{locals()[f'news{i}'].type()}、{locals()[f'news{i}'].depart()}** <p align="right">点击量:{locals()[f'news{i}'].clicks()}</p>  
+**{locals()[f'news{i}'].type()}、{locals()[f'news{i}'].depart()}** <p align="left">点击量:{locals()[f'news{i}'].clicks()}</p>  
 
 ---""")
 
