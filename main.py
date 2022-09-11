@@ -26,9 +26,8 @@ def get_history():
     try:
         with open('history.txt', 'r', encoding='u8') as f:
             history = f.read().split(',')
-            print(history)
     except:
-        with open('history.txt','w',encoding='u8') as f:
+        with open('history.txt', 'w', encoding='u8') as f:
             history = []
     return history
 
@@ -110,12 +109,16 @@ def main():
 ---""")
 
         order_num += 1
-    
+
     # Write down history
-    with open('history.txt','w',encoding='u8') as f:
+    with open('history.txt', 'w', encoding='u8') as f:
         history = [i for i in history if i != '']
         for i in history:
             f.write(i+',')
+
+    if push == f"""<font face="黑体" color=green size=5>日期:{date_format}</font>  
+""":
+        push = '### 没有新内容'
 
     # Check if need to push by pushplus
     if push_token:
@@ -126,7 +129,7 @@ def main():
         except:
             print('Internet disconnected')
             exit()
-            
+
     else:
         print(push)
 
