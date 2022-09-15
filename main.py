@@ -1,16 +1,34 @@
 import re
 from datetime import datetime
 import requests as r
+from json import loads
+from os import path
+
 
 # ========================= Configuration Part =========================
-clicks_limit = 0  # Push the news which have clicks more than this num
-push_token = ''  # Pushplus Token
-history_dir = 'history.txt'
+# ======= Normally, you don't need to edit the following config. =======
+
+# Configuration dir (default: {main.py's path}\config.json)
+config_dir = ''
+
+# Push history dir (default: {main.py's path}\history.txt)
+history_dir = ''
+
+# UA
 headers = {
     'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/65.0.3325.181 Safari/537.36'}
+
+# proxy
 proxies = {'http': None, 'https': None}
+
+# Front page of SZU News
 board_url = 'https://www1.szu.edu.cn/board/'
 # ========================= Configuration Part =========================
+
+# Default history dir
+if history_dir == '':
+    history_dir = path.join(path.split(
+        path.abspath(__file__))[0], 'history.txt')
 
 # Some Regular Expressions
 re_type = re.compile(r"infotype=([\u4e00-\u9fa5]+)")
@@ -21,11 +39,36 @@ re_date = re.compile(r'>([0-9]{4}-[0-9]{1,2}-[0-9]{1,2})<')
 re_clicks = re.compile(r'title="累计点击数">([0-9]+)')
 
 
-def get_history():
-    # News that have been pushed will be record in history_dir
-    if datetime.now().hour == 7:
-        # Clean all history at 7 am
-        with open(history_dir,'w',encoding='u8') as f:
+def get_config(config_dir):  # Get configuration and translate to a dict
+    # Default config file dir
+    if config_dir == '':
+        config_dir = path.join(path.split(
+            path.abspath(__file__))[0], 'config.json')
+
+    try:  # Check if config file exists
+        with open(config_dir, 'r', encoding='u8') as f:
+            config_file_content = f.read()
+
+    except:  # Init config file if it is not exist
+        with open(config_dir, 'w', encoding='u8') as f:
+            config_file_content = '''{
+    "enable": 1,
+    "clicks_limit": 0,
+    "push_token": ""
+}'''
+            f.write(config_file_content)
+
+    config = loads(config_file_content)
+
+    if config['enable'] == 0:  # Power on/off
+        exit()
+
+    return config
+
+
+def get_history(history_dir):  # News that have been pushed will be record in history_dir
+    if datetime.now().hour == 7:  # Clean all history at 7 am
+        with open(history_dir, 'w', encoding='u8') as f:
             history = []
     else:
         try:
@@ -34,10 +77,10 @@ def get_history():
         except:
             with open(history_dir, 'w', encoding='u8') as f:
                 history = []
-    return history
+    return history  # Get history as a list
 
 
-def main():
+def main(config):
     try:
         req = r.get(url=board_url+'infolist.asp', headers=headers,
                     proxies=proxies, timeout=3)
@@ -83,23 +126,28 @@ def main():
     date_now = datetime.now()
 
     # Get push history
-    history = get_history()
+    history = get_history(history_dir)
 
     # Used to match News' dates
     date_format = f'{date_now.year}-{date_now.month}-{date_now.day}'
+    date_format_hour = f'{date_now.year}-{date_now.month}-{date_now.day} at {date_now.hour}'
 
     # Init push content
     push_title = '今日通告'
-    push_content = f"""<font face="黑体" color=green size=5>时间:{date_format + ' at ' + str(date_now.hour)}</font>  
+    push_content = f"""<font face="黑体" color=green size=5>时间:{date_format_hour}</font>  
 """
+
     for i in range(0, len(news_links)):
         # Create News Objects
         locals()[f'news{i}'] = News(i)
 
-        if int(locals()[f'news{i}'].clicks()) >= clicks_limit and locals()[f'news{i}'].date() == date_format[:] and locals()[f'news{i}'].link() not in history:
-            rank.append((i, locals()[f'news{i}'].clicks()))
+        # Choose news to push
+        if int(locals()[f'news{i}'].clicks()) >= config['clicks_limit']:
+            if locals()[f'news{i}'].date() == date_format:
+                if locals()[f'news{i}'].link() not in history:
+                    rank.append((i, locals()[f'news{i}'].clicks()))
 
-    # Sort by clicks
+    # Sort news by clicks
     rank.sort(key=lambda x: int(x[1]), reverse=True)
     rank = list(map(lambda x: x[0], rank))
 
@@ -116,30 +164,61 @@ def main():
 
         order_num += 1
 
-    # Write down history
-    with open(history_dir, 'w', encoding='u8') as f:
-        history = [i for i in history if i != '']
-        for i in history:
-            f.write(i+',')
-
     if push_content == f"""<font face="黑体" color=green size=5>时间:{date_format + ' at ' + str(date_now.hour)}</font>  
-""":
+""":  # This situation means nothing new was found
         push_title = '无新通告'
         push_content += '没有新内容'
 
     # Check if need to push by pushplus
-    if push_token:
+    if config['push_token']:
+        if len(push_content) > 10000:
+            # print('Data is too large')
+            # if exceed words limit, show top 10 news
+            push_content = f"""<font face="黑体" color=green size=5>时间:{date_format + ' at ' + str(date_now.hour)}</font>  
+"""
+
+            history = []  # Reset history
+            order_num = 1  # Reset order
+
+            for u in range(10):  # Reset push content
+
+                i = rank[u]
+
+                # Record News which will be pushed
+                history.append(f"{locals()[f'news{i}'].link()}")
+
+                # Markdown format
+                push_content += (f"""  
+{order_num}. [{locals()[f'news{i}'].title()}]({board_url}view.asp?id={locals()[f'news{i}'].link()})  
+**Tag:{locals()[f'news{i}'].type()}、{locals()[f'news{i}'].depart()}** <p align="left">点击量:{locals()[f'news{i}'].clicks()}</p>  
+
+---""")
+                order_num += 1
+
+            # Add explanation
+            push_content += f'*还有{len(rank)-10}条内容因数据过多而无法全部推送*'
+
+        # Pushplus
         try:
             pushplus = r.get(
-                url=f'http://www.pushplus.plus/send?token={push_token}&title={push_title}&content={push_content}&template=markdown', proxies=proxies)
-            print(pushplus.text)  # Results
+                url=f'http://www.pushplus.plus/send?token={config["push_token"]}&title={push_title}&content={push_content}&template=markdown', proxies=proxies)
+            push_response = pushplus.text  # Push result
+            print(date_format_hour + ' : ' + push_response) # Output log
         except:
             print('Internet disconnected')
             exit()
 
     else:
-        print(push_content)
+        print('未设置pushplus token, 不进行推送')
+        # If you need to output the content, uncomment the following code
+        # print(date_format_hour + '\r' + push_content)
+
+    # Write history
+    with open(history_dir, 'w', encoding='u8') as f:
+        history = [i for i in history if i != '']
+        for i in history:
+            f.write(i+',')
 
 
 if __name__ == '__main__':
-    main()
+    main(get_config(config_dir))
