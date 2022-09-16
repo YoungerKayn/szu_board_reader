@@ -1,9 +1,11 @@
+__author__ = 'YoungerKayn'
+
 import re
 from datetime import datetime
-import requests as r
 from json import loads
 from os import path
 
+import requests as r
 
 # ========================= Configuration Part =========================
 # ======= Normally, you don't need to edit the following config. =======
