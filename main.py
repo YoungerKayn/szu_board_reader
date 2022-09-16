@@ -171,39 +171,50 @@ def main(config):
 
     # Check if need to push by pushplus
     if config['push_token']:
-        if len(push_content) > 10000:
-            # print('Data is too large')
-            # if exceed words limit, show top 10 news
-            push_content = f"""<font face="黑体" color=green size=5>时间:{date_format + ' at ' + str(date_now.hour)}</font>  
-"""
-
-            history = []  # Reset history
-            order_num = 1  # Reset order
-
-            for u in range(10):  # Reset push content
-
-                i = rank[u]
-
-                # Record News which will be pushed
-                history.append(f"{locals()[f'news{i}'].link()}")
-
-                # Markdown format
-                push_content += (f"""  
-{order_num}. [{locals()[f'news{i}'].title()}]({board_url}view.asp?id={locals()[f'news{i}'].link()})  
-**Tag:{locals()[f'news{i}'].type()}、{locals()[f'news{i}'].depart()}** <p align="left">点击量:{locals()[f'news{i}'].clicks()}</p>  
-
----""")
-                order_num += 1
-
-            # Add explanation
-            push_content += f'*还有{len(rank)-10}条内容因数据过多而无法全部推送*'
+        print(len(push_content))
 
         # Pushplus
         try:
             pushplus = r.get(
                 url=f'http://www.pushplus.plus/send?token={config["push_token"]}&title={push_title}&content={push_content}&template=markdown', proxies=proxies)
             push_response = pushplus.text  # Push result
-            print(date_format_hour + ' : ' + push_response) # Output log
+
+            if re.search('414', push_response):  # Data too large to push
+                # print('Data is too large')
+                # if exceed words limit, show top 10 news
+
+                # Reset push content
+                push_content = f"""<font face="黑体" color=green size=5>时间:{date_format + ' at ' + str(date_now.hour)}</font>  
+"""
+
+                history = []  # Reset history
+                order_num = 1  # Reset order
+
+                for u in range(10):  # Reset news
+
+                    i = rank[u]
+
+                    # Record News which will be pushed
+                    history.append(f"{locals()[f'news{i}'].link()}")
+
+                    # Markdown format
+                    push_content += (f"""  
+{order_num}. [{locals()[f'news{i}'].title()}]({board_url}view.asp?id={locals()[f'news{i}'].link()})  
+**Tag:{locals()[f'news{i}'].type()}、{locals()[f'news{i}'].depart()}** <p align="left">点击量:{locals()[f'news{i}'].clicks()}</p>  
+
+---""")
+                    order_num += 1
+
+                # Add explanation
+                push_content += f'*还有{len(rank)-10}条内容因数据过多而无法全部推送*'
+
+                # Push again
+                pushplus = r.get(
+                    url=f'http://www.pushplus.plus/send?token={config["push_token"]}&title={push_title}&content={push_content}&template=markdown', proxies=proxies)
+                push_response = pushplus.text  # Push result
+                
+            print(date_format_hour + ' : ' + push_response)  # Output log
+        # Fail to connect to Internet
         except:
             print('Internet disconnected')
             exit()
