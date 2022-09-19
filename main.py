@@ -1,5 +1,5 @@
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 import requests as r
 from json import loads
 from os import path
@@ -129,6 +129,8 @@ def main(config):
     history = get_history(history_dir)
 
     # Used to match News' dates
+    if date_now.hour == 0: # Push all news which haven't been push yesterday at 0:00
+        date_now -= timedelta(days=1)
     date_format = f'{date_now.year}-{date_now.month}-{date_now.day}'
     date_format_hour = f'{date_now.year}-{date_now.month}-{date_now.day} at {date_now.hour}'
 
