@@ -1,7 +1,7 @@
 __author__ = 'YoungerKayn'
 
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from json import loads
 from os import path
 
@@ -131,6 +131,8 @@ def main(config):
     history = get_history(history_dir)
 
     # Used to match News' dates
+    if date_now.hour == 0:  # Push all news which haven't been push yesterday at 0:00
+        date_now -= timedelta(days=1)
     date_format = f'{date_now.year}-{date_now.month}-{date_now.day}'
     date_format_hour = f'{date_now.year}-{date_now.month}-{date_now.day} at {date_now.hour}'
 
@@ -214,7 +216,7 @@ def main(config):
                 pushplus = r.get(
                     url=f'http://www.pushplus.plus/send?token={config["push_token"]}&title={push_title}&content={push_content}&template=markdown', proxies=proxies)
                 push_response = pushplus.text  # Push result
-                
+
             print(date_format_hour + ' : ' + push_response)  # Output log
         # Fail to connect to Internet
         except:
