@@ -16,6 +16,9 @@ config_dir = ''
 # Push history dir (default: {main.py's path}\history.txt)
 history_dir = ''
 
+# Amount of toplist (will be used when push content is too large)
+toplist_amount = 20
+
 # UA
 headers = {
     'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/65.0.3325.181 Safari/537.36'}
@@ -176,7 +179,7 @@ def main(config):
     # Check if need to push by pushplus
     if config['push_token']:
         print(len(push_content))
-
+        too_large_flag = 0 # Use to judge how much news to push
         # Pushplus
         try:
             pushplus = r.get(
@@ -190,11 +193,11 @@ def main(config):
                 # Reset push content
                 push_content = f"""<font face="黑体" color=green size=5>时间:{date_format + ' at ' + str(date_now.hour)}</font>  
 """
-
+                
                 history = []  # Reset history
                 order_num = 1  # Reset order
 
-                for u in range(10):  # Reset news
+                for u in range(toplist_amount):  # Reset news
 
                     i = rank[u]
 
@@ -210,7 +213,7 @@ def main(config):
                     order_num += 1
 
                 # Add explanation
-                push_content += f'*还有{len(rank)-10}条内容因数据过多而无法全部推送*'
+                push_content += f'*还有{len(rank)-toplist_amount}条内容因数据过多而无法全部推送*'
 
                 # Push again
                 pushplus = r.get(
