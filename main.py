@@ -1,12 +1,14 @@
+__author__ = 'YoungerKayn'
+
 import re
 from datetime import datetime, timedelta
-import requests as r
 from json import loads
 from os import path
+from sys import argv
 
+import requests as r
 
 # ========================= Configuration Part =========================
-# ======= Normally, you don't need to edit the following config. =======
 
 # Configuration dir (default: {main.py's path}\config.json)
 config_dir = ''
@@ -14,9 +16,11 @@ config_dir = ''
 # Push history dir (default: {main.py's path}\history.txt)
 history_dir = ''
 
+# Amount of toplist (will be used when push content is too large)
+toplist_amount = 10
+
 # UA
-headers = {
-    'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/65.0.3325.181 Safari/537.36'}
+user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
 
 # proxy
 proxies = {'http': None, 'https': None}
@@ -27,12 +31,12 @@ board_url = 'https://www1.szu.edu.cn/board/'
 
 # Default history dir
 if history_dir == '':
-    history_dir = path.join(path.split(
-        path.abspath(__file__))[0], 'history.txt')
+    history_dir = path.join(
+        path.split(path.abspath(__file__))[0], 'history.txt')
 
 # Some Regular Expressions
 re_type = re.compile(r"infotype=([\u4e00-\u9fa5]+)")
-re_depart = re.compile(r"value='([\u4e00-\u9fa5]+)'")
+re_depart = re.compile(r"\.value='([\u4e00-\u9fa5]+)'")
 re_link = re.compile(r'href="view.asp\?id=([0-9]+)">')
 re_title = re.compile(r'href="view.asp\?id=[0-9]+">(.+?)</a>')
 re_date = re.compile(r'>([0-9]{4}-[0-9]{1,2}-[0-9]{1,2})<')
@@ -42,8 +46,8 @@ re_clicks = re.compile(r'title="累计点击数">([0-9]+)')
 def get_config(config_dir):  # Get configuration and translate to a dict
     # Default config file dir
     if config_dir == '':
-        config_dir = path.join(path.split(
-            path.abspath(__file__))[0], 'config.json')
+        config_dir = path.join(
+            path.split(path.abspath(__file__))[0], 'config.json')
 
     try:  # Check if config file exists
         with open(config_dir, 'r', encoding='u8') as f:
@@ -66,7 +70,8 @@ def get_config(config_dir):  # Get configuration and translate to a dict
     return config
 
 
-def get_history(history_dir):  # News that have been pushed will be record in history_dir
+def get_history(history_dir
+                ):  # News that have been pushed will be record in history_dir
     if datetime.now().hour == 7:  # Clean all history at 7 am
         with open(history_dir, 'w', encoding='u8') as f:
             history = []
@@ -81,13 +86,25 @@ def get_history(history_dir):  # News that have been pushed will be record in hi
 
 
 def main(config):
+    headers = {
+        'content-type': "application/x-www-form-urlencoded",
+        'User-Agent': user_agent,
+        "Referer":
+        "https://authserver.szu.edu.cn/authserver/login?service=http%3A%2F%2Fwww1%2Eszu%2Eedu%2Ecn%2Fmanage%2Fcaslogin%2Easp%3Frurl%3D%252Fboard%252F",
+        "Cookie": f"ASPSESSIONIDCQATBQBR=NJFKIKEDAKADAALNIDGDJHLJ"
+    }
+    print(headers)
     try:
-        req = r.get(url=board_url+'infolist.asp', headers=headers,
-                    proxies=proxies, timeout=3)
+        req = r.get(url=board_url + 'infolist.asp',
+                    headers=headers,
+                    proxies=proxies,
+                    timeout=3)
+        req.encoding = 'gb2312'
+        print(req.text)
     except:
+        print(date_format_hour)
         print('Intranet disconnected')
         exit()
-    req.encoding = 'gb2312'
     page_content = req.text
     news_types = re_type.findall(page_content)
     news_departs = re_depart.findall(page_content)
@@ -97,6 +114,7 @@ def main(config):
     news_clicks = re_clicks.findall(page_content)
 
     class News(object):
+
         def __init__(self, number) -> None:
             self.number = number
 
@@ -119,8 +137,10 @@ def main(config):
             return news_dates[self.number]
 
         def clicks(self):
-            return news_clicks[self.number]
-
+            # if news_clicks[self.number]:
+            #     return news_clicks[self.number]
+            return 0 # 公文通已不显示点击量
+            
     order_num = 1  # Order of News
     rank = []  # News' clicks ranking
     date_now = datetime.now()
@@ -129,7 +149,7 @@ def main(config):
     history = get_history(history_dir)
 
     # Used to match News' dates
-    if date_now.hour == 0: # Push all news which haven't been push yesterday at 0:00
+    if date_now.hour == 0:  # Push all news which haven't been push yesterday at 0:00
         date_now -= timedelta(days=1)
     date_format = f'{date_now.year}-{date_now.month}-{date_now.day}'
     date_format_hour = f'{date_now.year}-{date_now.month}-{date_now.day} at {date_now.hour}'
@@ -174,11 +194,14 @@ def main(config):
     # Check if need to push by pushplus
     if config['push_token']:
         print(len(push_content))
+        too_large_flag = 0  # Use to judge how much news to push
 
         # Pushplus
         try:
             pushplus = r.get(
-                url=f'http://www.pushplus.plus/send?token={config["push_token"]}&title={push_title}&content={push_content}&template=markdown', proxies=proxies)
+                url=
+                f'http://www.pushplus.plus/send?token={config["push_token"]}&title={push_title}&content={push_content}&template=markdown',
+                proxies=proxies)
             push_response = pushplus.text  # Push result
 
             if re.search('414', push_response):  # Data too large to push
@@ -192,7 +215,7 @@ def main(config):
                 history = []  # Reset history
                 order_num = 1  # Reset order
 
-                for u in range(10):  # Reset news
+                for u in range(toplist_amount):  # Reset news
 
                     i = rank[u]
 
@@ -208,21 +231,25 @@ def main(config):
                     order_num += 1
 
                 # Add explanation
-                push_content += f'*还有{len(rank)-10}条内容因数据过多而无法全部推送*'
+                push_content += f'*还有{len(rank)-toplist_amount}条内容因数据过多而无法全部推送*'
 
                 # Push again
                 pushplus = r.get(
-                    url=f'http://www.pushplus.plus/send?token={config["push_token"]}&title={push_title}&content={push_content}&template=markdown', proxies=proxies)
+                    url=
+                    f'http://www.pushplus.plus/send?token={config["push_token"]}&title={push_title}&content={push_content}&template=markdown',
+                    proxies=proxies)
                 push_response = pushplus.text  # Push result
-                
+
             print(date_format_hour + ' : ' + push_response)  # Output log
         # Fail to connect to Internet
         except:
+            print(date_format_hour)
             print('Internet disconnected')
             exit()
 
     else:
         print('未设置pushplus token, 不进行推送')
+        print(push_content)
         # If you need to output the content, uncomment the following code
         # print(date_format_hour + '\r' + push_content)
 
@@ -230,7 +257,11 @@ def main(config):
     with open(history_dir, 'w', encoding='u8') as f:
         history = [i for i in history if i != '']
         for i in history:
-            f.write(i+',')
+            f.write(i + ',')
+
+
+def push(push_content, push_token):
+    pass
 
 
 if __name__ == '__main__':
